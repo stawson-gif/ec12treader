@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECG Analyzer — EC12T</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Unbounded:wght@300;700;900&display=swap');
+
+:root {
+–bg:       #0a0e1a;
+–surface:  #111827;
+–card:     #161e30;
+–border:   #1f2d45;
+–accent:   #00e5ff;
+–accent2:  #ff4060;
+–green:    #00ff88;
+–text:     #c8d8f0;
+–muted:    #4a6080;
+–grid-maj: rgba(255,64,96,.25);
+–grid-min: rgba(255,64,96,.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: ‘Space Mono’, monospace;
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* ── scanline overlay ─────────────────────────────────────── */
+body::before {
+content: ‘’;
+position: fixed; inset: 0;
+background: repeating-linear-gradient(
+0deg,
+transparent,
+transparent 2px,
+rgba(0,0,0,.15) 2px,
+rgba(0,0,0,.15) 4px
+);
+pointer-events: none;
+z-index: 9999;
+}
+
+/* ── header ───────────────────────────────────────────────── */
+header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 18px 32px;
+border-bottom: 1px solid var(–border);
+background: linear-gradient(90deg, #0d1525 0%, #0a0e1a 100%);
+position: sticky; top: 0; z-index: 100;
+}
+.logo {
+font-family: ‘Unbounded’, sans-serif;
+font-weight: 900;
+font-size: 1.1rem;
+letter-spacing: .08em;
+color: var(–accent);
+text-transform: uppercase;
+display: flex;
+align-items: center;
+gap: 10px;
+}
+.logo-pulse {
+width: 10px; height: 10px;
+border-radius: 50%;
+background: var(–accent2);
+animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+0%,100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(255,64,96,.6); }
+50%      { opacity: .7; transform: scale(1.2); box-shadow: 0 0 0 6px rgba(255,64,96,0); }
+}
+.header-tag {
+font-size: .68rem;
+color: var(–muted);
+letter-spacing: .12em;
+text-transform: uppercase;
+}
+
+/* ── main layout ──────────────────────────────────────────── */
+main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+/* ── drop zone ────────────────────────────────────────────── */
+#dropzone {
+border: 2px dashed var(–border);
+border-radius: 12px;
+padding: 64px 32px;
+text-align: center;
+cursor: pointer;
+transition: border-color .25s, background .25s;
+background: var(–surface);
+position: relative;
+overflow: hidden;
+}
+#dropzone::before {
+content: ‘’;
+position: absolute; inset: 0;
+background: radial-gradient(ellipse at 50% 100%, rgba(0,229,255,.06) 0%, transparent 70%);
+pointer-events: none;
+}
+#dropzone.drag-over, #dropzone:hover {
+border-color: var(–accent);
+background: #0e1928;
+}
+#dropzone.drag-over { border-style: solid; }
+.drop-icon {
+font-size: 3.5rem;
+margin-bottom: 16px;
+filter: drop-shadow(0 0 12px var(–accent));
+}
+.drop-title {
+font-family: ‘Unbounded’, sans-serif;
+font-size: 1rem;
+font-weight: 700;
+color: var(–accent);
+margin-bottom: 8px;
+letter-spacing: .05em;
+}
+.drop-sub { font-size: .78rem; color: var(–muted); line-height: 1.7; }
+#fileInput { display: none; }
+
+/* ── status bar ───────────────────────────────────────────── */
+#statusBar {
+margin-top: 16px;
+padding: 10px 18px;
+border-radius: 8px;
+font-size: .78rem;
+background: var(–surface);
+border: 1px solid var(–border);
+display: flex;
+align-items: center;
+gap: 10px;
+min-height: 42px;
+transition: border-color .3s;
+}
+#statusBar.ok  { border-color: var(–green);   color: var(–green); }
+#statusBar.err { border-color: var(–accent2);  color: var(–accent2); }
+#statusBar.run { border-color: var(–accent);   color: var(–accent); }
+.spin {
+width: 14px; height: 14px;
+border: 2px solid currentColor;
+border-top-color: transparent;
+border-radius: 50%;
+display: none;
+animation: spin .7s linear infinite;
+flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#statusBar.run .spin { display: block; }
+
+/* ── metrics row ──────────────────────────────────────────── */
+#metrics {
+display: none;
+grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+gap: 14px;
+margin-top: 24px;
+}
+.metric-card {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: 10px;
+padding: 16px 18px;
+position: relative;
+overflow: hidden;
+transition: border-color .2s, transform .2s;
+}
+.metric-card:hover { border-color: var(–accent); transform: translateY(-2px); }
+.metric-card::after {
+content: ‘’;
+position: absolute;
+bottom: 0; left: 0; right: 0;
+height: 3px;
+background: linear-gradient(90deg, var(–accent), var(–accent2));
+transform: scaleX(0); transform-origin: left;
+transition: transform .3s;
+}
+.metric-card:hover::after { transform: scaleX(1); }
+.metric-label { font-size: .65rem; color: var(–muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+.metric-value { font-family: ‘Unbounded’, sans-serif; font-size: 1.3rem; font-weight: 700; color: var(–accent); }
+.metric-unit  { font-size: .65rem; color: var(–muted); margin-left: 4px; }
+.metric-status { font-size: .68rem; margin-top: 4px; }
+.ok-tag  { color: var(–green); }
+.warn-tag { color: #ffbe00; }
+.err-tag  { color: var(–accent2); }
+
+/* ── ECG canvas section ───────────────────────────────────── */
+#ecgSection { display: none; margin-top: 28px; }
+.section-title {
+font-family: ‘Unbounded’, sans-serif;
+font-size: .75rem;
+font-weight: 700;
+letter-spacing: .15em;
+text-transform: uppercase;
+color: var(–muted);
+margin-bottom: 14px;
+display: flex;
+align-items: center;
+gap: 10px;
+}
+.section-title::after {
+content: ‘’;
+flex: 1;
+height: 1px;
+background: var(–border);
+}
+
+.ecg-grid {
+display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 8px;
+}
+@media (max-width: 900px) { .ecg-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .ecg-grid { grid-template-columns: 1fr; } }
+
+.ecg-panel {
+background: #0d1420;
+border: 1px solid var(–border);
+border-radius: 8px;
+padding: 8px 10px 6px;
+position: relative;
+}
+.ecg-lead-name {
+font-family: ‘Unbounded’, sans-serif;
+font-size: .65rem;
+font-weight: 700;
+color: var(–accent2);
+letter-spacing: .1em;
+margin-bottom: 4px;
+}
+canvas.ecg-canvas {
+width: 100%;
+height: 90px;
+display: block;
+image-rendering: crisp-edges;
+}
+
+/* ── action buttons ───────────────────────────────────────── */
+#actions { display: none; margin-top: 24px; display: none; gap: 14px; flex-wrap: wrap; }
+.btn {
+font-family: ‘Space Mono’, monospace;
+font-size: .78rem;
+font-weight: 700;
+letter-spacing: .08em;
+text-transform: uppercase;
+padding: 12px 28px;
+border-radius: 8px;
+border: none;
+cursor: pointer;
+transition: all .2s;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.btn-primary {
+background: linear-gradient(135deg, #00bcd4 0%, #0077aa 100%);
+color: #fff;
+box-shadow: 0 4px 18px rgba(0,188,212,.3);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,188,212,.45); }
+.btn-secondary {
+background: transparent;
+color: var(–accent);
+border: 1px solid var(–accent);
+}
+.btn-secondary:hover { background: rgba(0,229,255,.08); }
+
+/* ── interpretation box ───────────────────────────────────── */
+#interpretation { display: none; margin-top: 24px; }
+.interp-box {
+background: var(–card);
+border: 1px solid var(–border);
+border-left: 3px solid var(–accent2);
+border-radius: 10px;
+padding: 20px 24px;
+font-size: .8rem;
+line-height: 1.9;
+color: var(–text);
+}
+.interp-box .warning {
+display: inline-block;
+margin-top: 10px;
+padding: 8px 14px;
+background: rgba(255,64,96,.12);
+border: 1px solid rgba(255,64,96,.3);
+border-radius: 6px;
+color: var(–accent2);
+font-size: .73rem;
+line-height: 1.6;
+}
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-pulse"></div>
+    ECG Analyzer
+  </div>
+  <span class="header-tag">EC12T-01 · 12-Lead · Auto Report</span>
+</header>
+
+<main>
+  <!-- Drop zone -->
+  <div id="dropzone" onclick="document.getElementById('fileInput').click()">
+    <div class="drop-icon">🫀</div>
+    <div class="drop-title">Перетащите .ECG файл сюда</div>
+    <div class="drop-sub">
+      или нажмите для выбора<br>
+      Поддерживается формат EC12T-01 (8 каналов · 500 Гц · 16-bit LE)
+    </div>
+    <input type="file" id="fileInput" accept=".ecg,.ECG">
+  </div>
+
+  <!-- Status -->
+
+  <div id="statusBar">
+    <div class="spin"></div>
+    <span id="statusText">Ожидание файла...</span>
+  </div>
+
+  <!-- Metrics -->
+
+  <div id="metrics" style="display:none; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap:14px; margin-top:24px;"></div>
+
+  <!-- ECG waveforms -->
+
+  <div id="ecgSection">
+    <div class="section-title">Отведения ЭКГ · 10 секунд · 25 мм/с · 10 мм/мВ</div>
+    <div class="ecg-grid" id="ecgGrid"></div>
+  </div>
+
+  <!-- Interpretation -->
+
+  <div id="interpretation">
+    <div class="section-title">Автоматическое заключение</div>
+    <div class="interp-box" id="interpText"></div>
+  </div>
+
+  <!-- Actions -->
+
+  <div id="actions" style="margin-top:24px; display:none; gap:14px; flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="exportPDF()">⬇ Скачать PDF-отчёт</button>
+    <button class="btn btn-secondary" onclick="resetApp()">↺ Загрузить другой файл</button>
+  </div>
+</main>
+
+<script>
+// ── Drag & drop ─────────────────────────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) processFile(fileInput.files[0]); });
+
+// ── Status helpers ───────────────────────────────────────────────────────────
+function setStatus(msg, type='') {
+  const bar = document.getElementById('statusBar');
+  bar.className = type;
+  document.getElementById('statusText').textContent = msg;
+}
+
+// ── Main pipeline ────────────────────────────────────────────────────────────
+let G = {}; // global state
+
+async function processFile(file) {
+  setStatus(`Чтение файла: ${file.name} (${(file.size/1024).toFixed(1)} КБ)...`, 'run');
+  try {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+
+    // ── Parse header ──────────────────────────────────────────
+    const dec = new TextDecoder('latin1');
+    const device = dec.decode(bytes.slice(8, 28)).replace(/\0/g, '').trim();
+
+    // Date: offset 44 = day, 45 = month, 46-47 = year (LE uint16)
+    const day   = bytes[44];
+    const month = bytes[45];
+    const year  = bytes[46] | (bytes[47] << 8);
+    const hour  = bytes[48];
+    const min   = bytes[49];
+    const sec   = bytes[50];
+    const dateStr = `${pad(day)}.${pad(month)}.${year}  ${pad(hour)}:${pad(min)}:${pad(sec)}`;
+
+    // ── Decode signal ──────────────────────────────────────────
+    const START = 247, NCH = 8, NSAMP = 16000, FS = 500, SCALE = 0.005;
+    const view = new DataView(buf, START, NCH * NSAMP * 2);
+    const sig = [];
+    for (let ch = 0; ch < NCH; ch++) sig.push(new Float32Array(NSAMP));
+    for (let i = 0; i < NSAMP; i++)
+      for (let ch = 0; ch < NCH; ch++)
+        sig[ch][i] = view.getInt16((i * NCH + ch) * 2, true) * SCALE;
+
+    // Derived leads
+    const lead_I   = sig[0], lead_II  = sig[1];
+    const lead_III = derive(lead_II, lead_I, (a,b) => a - b);
+    const lead_aVR = derive(lead_I,  lead_II, (a,b) => -(a + b) / 2);
+    const lead_aVL = derive(lead_I,  lead_II, (a,b) => a - b / 2);
+    const lead_aVF = derive(lead_II, lead_I,  (a,b) => a - b / 2);
+
+    const leads12 = [
+      ['I', lead_I],   ['aVR', lead_aVR], ['V1', sig[2]], ['V4', sig[5]],
+      ['II', lead_II], ['aVL', lead_aVL], ['V2', sig[3]], ['V5', sig[6]],
+      ['III', lead_III],['aVF', lead_aVF],['V3', sig[4]], ['V6', sig[7]],
+    ];
+
+    // ── Measurements ──────────────────────────────────────────
+    const l2bp = bandpass(lead_II, FS);
+    const rPeaks = findPeaks(l2bp, { minDist: Math.round(0.35*FS), minHeight: percentile(l2bp, 60) });
+    const rr_s = diffArr(rPeaks).map(d => d / FS).filter(r => r > 0.4 && r < 1.8);
+    const hrVal = rr_s.length > 0 ? 60.0 / mean(rr_s) : 0;
+    const rr_ms = rr_s.length > 0 ? mean(rr_s) * 1000 : 0;
+
+    // QRS from V2
+    const v2bp = bandpass(sig[3], FS);
+    const qrsDur = estimateQRS(v2bp, FS);
+    const qtEst  = qrsDur + 280;
+    const qtc    = rr_s.length > 0 ? qtEst / Math.sqrt(mean(rr_s)) : 0;
+
+    // Electric axis
+    const meanI  = mean(Array.from(lead_I.slice(0, 2500)));
+    const meanAVF= mean(Array.from(lead_aVF.slice(0, 2500)));
+    let axisStr = 'Нормальная (0°–+90°)';
+    if (meanI > 0 && meanAVF < 0) axisStr = 'Отклонение влево';
+    else if (meanI < 0 && meanAVF > 0) axisStr = 'Отклонение вправо';
+    else if (meanI < 0 && meanAVF < 0) axisStr = 'Неопределённая';
+
+    // Save global state for PDF
+    G = { file, device, dateStr, leads12, FS, NSAMP, SCALE,
+          hrVal, rr_ms, qrsDur, qtEst, qtc, axisStr, rPeaks };
+
+    setStatus(`✓ Файл успешно обработан: ${file.name}`, 'ok');
+
+    // ── Render metrics ─────────────────────────────────────────
+    renderMetrics(hrVal, rr_ms, qrsDur, qtEst, qtc, axisStr, rPeaks.length, dateStr);
+
+    // ── Render ECG strips ──────────────────────────────────────
+    renderECG(leads12, FS);
+
+    // ── Render interpretation ──────────────────────────────────
+    renderInterp(hrVal, qrsDur, qtc, axisStr);
+
+    // Show actions
+    document.getElementById('actions').style.display = 'flex';
+
+  } catch(e) {
+    setStatus('Ошибка: ' + e.message, 'err');
+    console.error(e);
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2,'0'); }
+function mean(arr) { return arr.reduce((s,v) => s+v, 0) / arr.length; }
+function derive(a, b, fn) {
+  const out = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = fn(a[i], b[i]);
+  return out;
+}
+function diffArr(arr) {
+  const out = [];
+  for (let i = 1; i < arr.length; i++) out.push(arr[i] - arr[i-1]);
+  return out;
+}
+function percentile(arr, p) {
+  const sorted = [...arr].sort((a,b) => a-b);
+  return sorted[Math.floor(sorted.length * p / 100)];
+}
+
+// Simple bandpass: high-pass then low-pass using 1st-order IIR
+function bandpass(sig, fs) {
+  const out = new Float32Array(sig.length);
+  // High-pass 0.5 Hz
+  const rc_hp = 1.0 / (2 * Math.PI * 0.5);
+  const dt = 1.0 / fs;
+  const a_hp = rc_hp / (rc_hp + dt);
+  let prev = sig[0], prevOut = 0;
+  for (let i = 1; i < sig.length; i++) {
+    out[i] = a_hp * (out[i-1] + sig[i] - sig[i-1]);
+  }
+  // Low-pass 40 Hz
+  const rc_lp = 1.0 / (2 * Math.PI * 40);
+  const a_lp  = dt / (rc_lp + dt);
+  const lp = new Float32Array(out.length);
+  lp[0] = out[0];
+  for (let i = 1; i < out.length; i++) lp[i] = lp[i-1] + a_lp * (out[i] - lp[i-1]);
+  return lp;
+}
+
+function findPeaks(sig, { minDist = 250, minHeight = 0 } = {}) {
+  const peaks = [];
+  for (let i = 1; i < sig.length - 1; i++) {
+    if (sig[i] > sig[i-1] && sig[i] > sig[i+1] && sig[i] > minHeight) {
+      if (!peaks.length || i - peaks[peaks.length-1] >= minDist) {
+        peaks.push(i);
+      } else if (sig[i] > sig[peaks[peaks.length-1]]) {
+        peaks[peaks.length-1] = i;
+      }
+    }
+  }
+  return peaks;
+}
+
+function estimateQRS(sig, fs) {
+  const peaks = findPeaks(sig, { minDist: Math.round(0.35*fs), minHeight: percentile(sig, 60) });
+  if (peaks.length < 3) return 90;
+  const thr = 0.2 * Math.max(...peaks.slice(1,-1).map(p => Math.abs(sig[p])));
+  const widths = [];
+  for (const pk of peaks.slice(1,-1)) {
+    let s = pk, e = pk;
+    while (s > 0 && Math.abs(sig[s]) > thr) s--;
+    while (e < sig.length-1 && Math.abs(sig[e]) > thr) e++;
+    widths.push((e - s) / fs * 1000);
+  }
+  return widths.length ? mean(widths) : 90;
+}
+
+// ── Render metrics ───────────────────────────────────────────────────────────
+function renderMetrics(hr, rr, qrs, qt, qtc, axis, nPeaks, date) {
+  const el = document.getElementById('metrics');
+  const items = [
+    { label: 'ЧСС', val: hr.toFixed(0), unit: 'уд/мин',
+      status: hr < 60 ? ['Брадикардия','warn-tag'] : hr > 100 ? ['Тахикардия','err-tag'] : ['Норма','ok-tag'] },
+    { label: 'R-R интервал', val: rr.toFixed(0), unit: 'мс',
+      status: rr>600&&rr<1000 ? ['Норма','ok-tag'] : ['Отклонение','warn-tag'] },
+    { label: 'QRS', val: qrs.toFixed(0), unit: 'мс',
+      status: qrs < 120 ? ['Норма','ok-tag'] : ['Уширен','err-tag'] },
+    { label: 'QT (расч.)', val: qt.toFixed(0), unit: 'мс', status: ['', ''] },
+    { label: 'QTc (Базетт)', val: qtc.toFixed(0), unit: 'мс',
+      status: qtc < 440 ? ['Норма','ok-tag'] : qtc < 480 ? ['Пограничный','warn-tag'] : ['Удлинён','err-tag'] },
+    { label: 'Ось сердца', val: '—', unit: '',
+      status: [axis, axis.includes('Норм') ? 'ok-tag' : 'warn-tag'] },
+    { label: 'R-пики обнар.', val: nPeaks, unit: 'шт.', status: ['', ''] },
+  ];
+  el.innerHTML = items.map(m => `
+    <div class="metric-card">
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-value">${m.val}<span class="metric-unit">${m.unit}</span></div>
+      ${m.status[0] ? `<div class="metric-status ${m.status[1]}">${m.status[0]}</div>` : ''}
+    </div>`).join('');
+  el.style.display = 'grid';
+}
+
+// ── Render ECG strips ─────────────────────────────────────────────────────────
+function renderECG(leads12, FS) {
+  const section = document.getElementById('ecgSection');
+  const grid    = document.getElementById('ecgGrid');
+  grid.innerHTML = '';
+  const SHOW = Math.round(10 * FS); // 10 s
+
+  leads12.forEach(([name, sig]) => {
+    const panel = document.createElement('div');
+    panel.className = 'ecg-panel';
+    panel.innerHTML = `<div class="ecg-lead-name">${name}</div>
+      <canvas class="ecg-canvas" width="600" height="90"></canvas>`;
+    grid.appendChild(panel);
+
+    const cvs = panel.querySelector('canvas');
+    const ctx = cvs.getContext('2d');
+    const W = 600, H = 90;
+
+    // Grid
+    const majorColor = 'rgba(255,60,80,0.25)';
+    const minorColor = 'rgba(255,60,80,0.08)';
+    // minor: every 0.04s = every 24 px at 600/10s
+    const pxPerSec = W / 10;
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x <= W; x += pxPerSec * 0.04) {
+      ctx.strokeStyle = minorColor; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    for (let x = 0; x <= W; x += pxPerSec * 0.2) {
+      ctx.strokeStyle = majorColor; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += H/6) {
+      ctx.strokeStyle = minorColor; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += H/3) {
+      ctx.strokeStyle = majorColor; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+
+    // Signal
+    const y = sig.slice(0, SHOW);
+    const base = y.reduce((s,v) => s+v, 0) / y.length;
+    const centered = y.map(v => v - base);
+    // Auto-scale: use 1.5mV range
+    const range = 1.5;
+    const midY = H / 2;
+
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    for (let i = 0; i < Math.min(y.length, SHOW); i++) {
+      const px = (i / SHOW) * W;
+      const py = midY - (centered[i] / range) * (H * 0.42);
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Calibration pulse
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    const cp = 4, cw = 12;
+    ctx.beginPath();
+    ctx.moveTo(cp,  midY + 9);
+    ctx.lineTo(cp,  midY + 9);
+    ctx.lineTo(cp,  midY - 9);
+    ctx.lineTo(cp+cw, midY - 9);
+    ctx.lineTo(cp+cw, midY + 9);
+    ctx.stroke();
+  });
+
+  section.style.display = 'block';
+}
+
+// ── Render interpretation ────────────────────────────────────────────────────
+function renderInterp(hr, qrs, qtc, axis) {
+  const rhythmDesc = hr < 60 ? 'Брадикардия' : hr > 100 ? 'Синусовая тахикардия' : 'Синусовый ритм';
+  const qrsDesc    = qrs < 120 ? 'в норме' : 'уширен (возможна блокада ножки пучка Гиса)';
+  const qtcDesc    = qtc < 440 ? 'в пределах нормы' : qtc < 480 ? 'пограничный' : 'удлинён (риск аритмии)';
+
+  const html = `
+    <b>Ритм:</b> ${rhythmDesc}, ЧСС ≈ ${hr.toFixed(0)} уд/мин.<br>
+    <b>Проводимость:</b> QRS ≈ ${qrs.toFixed(0)} мс — ${qrsDesc}.<br>
+    <b>Реполяризация:</b> QTc ≈ ${qtc.toFixed(0)} мс — ${qtcDesc}.<br>
+    <b>Электрическая ось:</b> ${axis}.<br>
+    <b>Отведения V1–V3:</b> оцените динамику зубца R и патологический Q.<br>
+    <b>Отведения V4–V6:</b> оцените амплитуду R и изменения сегмента ST/T.<br>
+    <div class="warning">⚠ Данное заключение сформировано автоматически и носит исключительно
+    предварительный информационный характер. Окончательная интерпретация ЭКГ
+    должна выполняться квалифицированным врачом-кардиологом.</div>`;
+
+  document.getElementById('interpText').innerHTML = html;
+  document.getElementById('interpretation').style.display = 'block';
+}
+
+// ── Export PDF ────────────────────────────────────────────────────────────────
+// All pages are rendered on <canvas> first, then inserted as images into the PDF.
+// This avoids ALL font/encoding issues — the browser renders the text natively.
+async function exportPDF() {
+  if (!G.leads12) return;
+
+  setStatus('Генерация PDF...', 'run');
+  await new Promise(r => setTimeout(r, 30)); // let UI update
+
+  const { jsPDF } = window.jspdf;
+  const SHOW = Math.round(10 * G.FS);
+
+  // ── PAGE 1: ECG waveforms ─────────────────────────────────────────────────
+  const P1W = 2480, P1H = 1754; // A4 landscape @300dpi
+  const c1 = document.createElement('canvas');
+  c1.width = P1W; c1.height = P1H;
+  const x1 = c1.getContext('2d');
+
+  // Background
+  x1.fillStyle = '#ffffff';
+  x1.fillRect(0, 0, P1W, P1H);
+
+  // Header bar
+  x1.fillStyle = '#1a3a6b';
+  x1.fillRect(0, 0, P1W, 110);
+  x1.fillStyle = '#ffffff';
+  x1.font = 'bold 52px Arial';
+  x1.textAlign = 'center';
+  x1.fillText('Электрокардиограмма — 12 стандартных отведений', P1W/2, 68);
+  x1.font = '30px Arial';
+  x1.textAlign = 'left';
+  x1.fillText(`Дата записи: ${G.dateStr}`, 40, 98);
+  x1.textAlign = 'center';
+  x1.fillText(`ЧСС: ${G.hrVal.toFixed(0)} уд/мин   |   Скорость: 25 мм/с   |   Усиление: 10 мм/мВ`, P1W/2, 98);
+  x1.textAlign = 'right';
+  x1.fillText(`Устройство: ${G.device}`, P1W - 40, 98);
+
+  // ECG grid – 4×3
+  const COLS = 4, ROWS = 3;
+  const padL = 50, padT = 130, padR = 30, padB = 60;
+  const cellW = (P1W - padL - padR) / COLS;
+  const cellH = (P1H - padT - padB) / ROWS;
+
+  G.leads12.forEach(([name, sig], idx) => {
+    const col = idx % 4, row = Math.floor(idx / 4);
+    const ox = padL + col * cellW, oy = padT + row * cellH;
+
+    // Cell border
+    x1.strokeStyle = '#cccccc'; x1.lineWidth = 1;
+    x1.strokeRect(ox, oy, cellW, cellH);
+
+    // Minor grid (0.04 s)
+    const pps = cellW / 10;
+    x1.lineWidth = 0.5;
+    for (let gx = 0; gx <= cellW; gx += pps * 0.04) {
+      x1.strokeStyle = 'rgba(210,80,80,0.15)';
+      x1.beginPath(); x1.moveTo(ox+gx, oy); x1.lineTo(ox+gx, oy+cellH); x1.stroke();
+    }
+    for (let gy = 0; gy <= cellH; gy += cellH / 10) {
+      x1.strokeStyle = 'rgba(210,80,80,0.15)';
+      x1.beginPath(); x1.moveTo(ox, oy+gy); x1.lineTo(ox+cellW, oy+gy); x1.stroke();
+    }
+    // Major grid (0.2 s)
+    x1.lineWidth = 1.2;
+    for (let gx = 0; gx <= cellW; gx += pps * 0.2) {
+      x1.strokeStyle = 'rgba(210,80,80,0.35)';
+      x1.beginPath(); x1.moveTo(ox+gx, oy); x1.lineTo(ox+gx, oy+cellH); x1.stroke();
+    }
+    for (let gy = 0; gy <= cellH; gy += cellH / 2) {
+      x1.strokeStyle = 'rgba(210,80,80,0.35)';
+      x1.beginPath(); x1.moveTo(ox, oy+gy); x1.lineTo(ox+cellW, oy+gy); x1.stroke();
+    }
+
+    // Lead label
+    x1.fillStyle = '#bb1122';
+    x1.font = 'bold 28px Arial';
+    x1.textAlign = 'left';
+    x1.fillText(name, ox + 12, oy + 32);
+
+    // Calibration pulse (1 mV)
+    const calX = ox + 10, calY = oy + cellH / 2, calH = cellH * 0.22;
+    x1.strokeStyle = '#888'; x1.lineWidth = 2;
+    x1.beginPath();
+    x1.moveTo(calX, calY + calH); x1.lineTo(calX, calY - calH);
+    x1.lineTo(calX + 20, calY - calH); x1.lineTo(calX + 20, calY + calH);
+    x1.stroke();
+
+    // Signal
+    const slice = sig.slice(0, SHOW);
+    const base = slice.reduce((s,v) => s+v, 0) / slice.length;
+    const range = 1.5;
+    const midY = oy + cellH / 2;
+    x1.strokeStyle = '#111111'; x1.lineWidth = 2;
+    x1.beginPath();
+    for (let i = 0; i < SHOW; i++) {
+      const px = ox + (i / SHOW) * cellW;
+      const py = midY - ((slice[i] - base) / range) * (cellH * 0.42);
+      i === 0 ? x1.moveTo(px, py) : x1.lineTo(px, py);
+    }
+    x1.stroke();
+  });
+
+  // Footer
+  x1.fillStyle = '#888888';
+  x1.font = '24px Arial';
+  x1.textAlign = 'center';
+  x1.fillText(
+    '1 большая клетка = 5 мм = 0.2 с   |   1 маленькая клетка = 1 мм = 0.04 с   |   Калибровочный импульс: 1 мВ',
+    P1W / 2, P1H - 22
+  );
+
+  // ── PAGE 2: Report canvas ─────────────────────────────────────────────────
+  const P2W = 2480, P2H = 1754;
+  const c2 = document.createElement('canvas');
+  c2.width = P2W; c2.height = P2H;
+  const x2 = c2.getContext('2d');
+
+  x2.fillStyle = '#ffffff';
+  x2.fillRect(0, 0, P2W, P2H);
+
+  // Header
+  x2.fillStyle = '#1a3a6b';
+  x2.fillRect(0, 0, P2W, 110);
+  x2.fillStyle = '#ffffff';
+  x2.font = 'bold 52px Arial';
+  x2.textAlign = 'center';
+  x2.fillText('Автоматическое заключение по ЭКГ', P2W/2, 68);
+  x2.font = '28px Arial';
+  x2.textAlign = 'left';
+  x2.fillText(`Дата: ${G.dateStr}   |   Устройство: ${G.device}   |   Файл: ${G.file.name}`, 40, 98);
+
+  // Section 1 title
+  let cy = 160;
+  x2.fillStyle = '#1a3a6b';
+  x2.font = 'bold 40px Arial';
+  x2.textAlign = 'left';
+  x2.fillText('1. Количественные параметры ЭКГ', 50, cy);
+  cy += 20;
+
+  const params = [
+    ['Частота сердечных сокращений (ЧСС)', `${G.hrVal.toFixed(0)} уд/мин`,
+      G.hrVal>100||G.hrVal<60 ? ['Отклонение', '#cc2020'] : ['Норма', '#008040']],
+    ['Средний R-R интервал', `${G.rr_ms.toFixed(0)} мс`, null],
+    ['Длительность комплекса QRS', `${G.qrsDur.toFixed(0)} мс`,
+      G.qrsDur < 120 ? ['Норма', '#008040'] : ['Уширен', '#cc2020']],
+    ['Интервал QT (расчётный)', `${G.qtEst.toFixed(0)} мс`, null],
+    ['QTc по Базетту', `${G.qtc.toFixed(0)} мс`,
+      G.qtc<440 ? ['Норма','#008040'] : G.qtc<480 ? ['Пограничный','#cc8800'] : ['Удлинён','#cc2020']],
+    ['Электрическая ось сердца', G.axisStr,
+      G.axisStr.includes('Норм') ? ['Норма','#008040'] : ['Отклонение','#cc8800']],
+  ];
+
+  const rowH = 72, tblX = 50, tblW = P2W - 100;
+  params.forEach((row, i) => {
+    const ry = cy + 14 + i * rowH;
+    x2.fillStyle = i % 2 === 0 ? '#eef2f8' : '#f8faff';
+    x2.fillRect(tblX, ry, tblW, rowH - 4);
+    x2.strokeStyle = '#d0d8e8'; x2.lineWidth = 1;
+    x2.strokeRect(tblX, ry, tblW, rowH - 4);
+
+    x2.fillStyle = '#222222';
+    x2.font = 'bold 28px Arial';
+    x2.textAlign = 'left';
+    x2.fillText(row[0], tblX + 20, ry + 44);
+
+    x2.font = '28px Arial';
+    x2.fillText(row[1], tblX + 1050, ry + 44);
+
+    if (row[2]) {
+      x2.fillStyle = row[2][1];
+      x2.font = 'bold 26px Arial';
+      x2.fillText(row[2][0], tblX + 1600, ry + 44);
+    }
+  });
+
+  cy += 14 + params.length * rowH + 30;
+
+  // Section 2 title
+  x2.fillStyle = '#1a3a6b';
+  x2.font = 'bold 40px Arial';
+  x2.textAlign = 'left';
+  x2.fillText('2. Описание и предварительное заключение', 50, cy);
+  cy += 16;
+
+  // Description box
+  const rhythmDesc = G.hrVal < 60 ? 'брадикардия' : G.hrVal > 100 ? 'синусовая тахикардия' : 'синусовый ритм, нормокардия';
+  const descLines = [
+    `• Ритм: ${rhythmDesc}, ЧСС ≈ ${G.hrVal.toFixed(0)} уд/мин.`,
+    `• Проводимость: QRS ≈ ${G.qrsDur.toFixed(0)} мс — ${G.qrsDur<120 ? 'в норме (< 120 мс)' : 'уширен (> 120 мс), возможна блокада ножки пучка Гиса'}.`,
+    `• Реполяризация: QTc ≈ ${G.qtc.toFixed(0)} мс — ${G.qtc<440 ? 'в пределах нормы' : G.qtc<480 ? 'пограничный' : 'удлинён (> 480 мс)'}.`,
+    `• Электрическая ось сердца: ${G.axisStr}.`,
+    '• Отведения V1–V3: оцените динамику нарастания зубца R и наличие патологического Q.',
+    '• Отведения V4–V6: оцените амплитуду зубца R и изменения сегмента ST и зубца T.',
+  ];
+  const lineH = 52;
+  const boxH = descLines.length * lineH + 40;
+  x2.fillStyle = '#f4f7ff';
+  x2.fillRect(50, cy, P2W - 100, boxH);
+  x2.strokeStyle = '#1a3a6b'; x2.lineWidth = 2;
+  x2.strokeRect(50, cy, P2W - 100, boxH);
+  // Left accent bar
+  x2.fillStyle = '#1a3a6b';
+  x2.fillRect(50, cy, 8, boxH);
+
+  x2.fillStyle = '#1a1a1a';
+  x2.font = '30px Arial';
+  x2.textAlign = 'left';
+  descLines.forEach((line, i) => {
+    x2.fillText(line, 80, cy + 42 + i * lineH);
+  });
+  cy += boxH + 30;
+
+  // Warning box
+  const warnLines = [
+    '⚠  ВАЖНО: данное заключение сформировано автоматически и носит исключительно предварительный,',
+    '   информационный характер. Окончательная интерпретация ЭКГ должна быть выполнена',
+    '   квалифицированным врачом-кардиологом.',
+  ];
+  const warnH = warnLines.length * lineH + 30;
+  x2.fillStyle = '#fff0f0';
+  x2.fillRect(50, cy, P2W - 100, warnH);
+  x2.strokeStyle = '#cc2020'; x2.lineWidth = 2;
+  x2.strokeRect(50, cy, P2W - 100, warnH);
+  x2.fillStyle = '#aa0000';
+  x2.fillRect(50, cy, 8, warnH);
+  x2.fillStyle = '#aa0000';
+  x2.font = 'bold 28px Arial';
+  warnLines.forEach((line, i) => {
+    x2.fillText(line, 80, cy + 38 + i * lineH);
+  });
+
+  // Footer
+  x2.fillStyle = '#999999';
+  x2.font = '24px Arial';
+  x2.textAlign = 'center';
+  x2.fillText(`ECG Analyzer  |  ${G.device}  |  Файл: ${G.file.name}`, P2W/2, P2H - 22);
+
+  // ── Assemble PDF ──────────────────────────────────────────────────────────
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const PW = 297, PH = 210;
+
+  doc.addImage(c1.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, PW, PH);
+  doc.addPage('a4', 'landscape');
+  doc.addImage(c2.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, PW, PH);
+
+  doc.save(`ECG_Report_${G.dateStr.replace(/[:\s]/g, '-')}.pdf`);
+  setStatus(`✓ PDF успешно сохранён`, 'ok');
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetApp() {
+  G = {};
+  document.getElementById('metrics').style.display = 'none';
+  document.getElementById('ecgSection').style.display = 'none';
+  document.getElementById('interpretation').style.display = 'none';
+  document.getElementById('actions').style.display = 'none';
+  document.getElementById('ecgGrid').innerHTML = '';
+  fileInput.value = '';
+  setStatus('Ожидание файла...', '');
+}
+</script>
+
+</body>
+</html>
