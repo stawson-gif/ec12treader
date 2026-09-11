@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Заполнение и экспорт учётной формы № 066/у — статистическая карта выбывшего из медицинской организации"
+    />
+    <title>Статистическая карта 066/у — заполнение и экспорт бланка</title>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Показывается, пока приложение не запустилось. Если оно запустилось — этот блок удаляется. -->
+      <div id="boot" style="font-family: Arial, Helvetica, sans-serif; padding: 48px 20px; text-align: center; color: #334155">
+        <div style="display: inline-block; width: 44px; height: 44px; border: 4px solid #e2e8f0; border-top-color: #4f46e5; border-radius: 50%; animation: bootspin 0.9s linear infinite"></div>
+        <p style="margin-top: 18px; font-size: 15px; font-weight: 600">Загрузка формы № 066/у…</p>
+        <p id="bootnote" style="margin-top: 6px; font-size: 12px; color: #94a3b8"></p>
+      </div>
+    </div>
+    <style>
+      @keyframes bootspin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #bootdiag {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      #bootdiag .box {
+        max-width: 720px;
+        margin: 40px auto;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-top: 4px solid #dc2626;
+        border-radius: 14px;
+        padding: 26px 28px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        text-align: left;
+      }
+      #bootdiag h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        color: #0f172a;
+      }
+      #bootdiag p,
+      #bootdiag li {
+        font-size: 14px;
+        line-height: 1.55;
+        color: #334155;
+      }
+      #bootdiag ol {
+        padding-left: 20px;
+        margin: 10px 0 0;
+      }
+      #bootdiag li {
+        margin-top: 7px;
+      }
+      #bootdiag code {
+        background: #f1f5f9;
+        border-radius: 5px;
+        padding: 1px 6px;
+        font-size: 13px;
+        color: #be123c;
+      }
+      #bootdiag .file {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-top: 14px;
+        font-size: 12px;
+        color: #64748b;
+        word-break: break-all;
+      }
+      #bootdiag .err {
+        background: #fef2f2;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-top: 14px;
+        font-size: 12px;
+        color: #991b1b;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #bootdiag button {
+        margin-top: 16px;
+        background: #4f46e5;
+        color: #fff;
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 18px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+
+    <!--
+      Сторож запуска. Обычный (не module) скрипт на ES5: выполняется всегда,
+      даже если основной код приложения не смог запуститься. Превращает белый
+      экран в понятное объяснение причины.
+    -->
+    <script>
+      (function () {
+        var started = false;
+        var lastError = "";
+
+        window.__form066Ready = function () {
+          started = true;
+          // убираем и заглушку загрузки, и диагностическую плашку,
+          // если приложение всё же запустилось позже таймера
+          ["boot", "bootdiag"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+          });
+        };
+
+        function why() {
+          var reasons = [];
+
+          // 1. Старый браузер: нет поддержки ES-модулей
+          if (!("noModule" in document.createElement("script"))) {
+            reasons.push(
+              "Браузер не поддерживает ES-модули — он слишком старый. Нужен Chrome (Edge) 2018 года или новее, Firefox 68+, Safari 11+."
+            );
+          }
+
+          // 2. Старый браузер: не понимает современный синтаксис
+          try {
+            new Function("var a=1;return a??2;");
+          } catch (e) {
+            reasons.push("Браузер не понимает современный JavaScript (оператор «??»). Обновите браузер или установите актуальный Google Chrome.");
+          }
+          try {
+            new Function("var o={};return o?.a;");
+          } catch (e) {
+            reasons.push("Браузер не понимает «опциональную цепочку» (?.). Обновите браузер.");
+          }
+
+          // 3. Открыт исходный файл проекта, а не собранный — самая частая причина
+          if (location.protocol === "file:") {
+            reasons.push(
+              "<b>Вы открыли не тот файл.</b> В проекте два файла с названием index.html: " +
+              "в корне проекта (исходный код — он <u>не может</u> работать в браузере) и готовое приложение. " +
+              "Готовые копии лежат здесь: <code>docs/index.html</code> и <code>dist/index.html</code>. " +
+              "Откройте двойным щелчком файл <code>docs/index.html</code>."
+            );
+          } else {
+            reasons.push(
+              "<b>По этому адресу опубликован исходный файл проекта</b> (index.html из корня репозитория), а не готовое приложение. " +
+              "В репозитории есть папка <code>docs</code> с уже собранной версией. " +
+              "Откройте <b>Settings → Pages</b> и выберите: Source = <code>Deploy from a branch</code>, " +
+              "Branch = <code>main</code>, Folder = <b><code>/docs</code></b>, затем Save. " +
+              "Через минуту приложение заработает без каких-либо сборок."
+            );
+          }
+
+          return reasons;
+        }
+
+        function show(reasonText) {
+          if (started) return;
+          var b = document.getElementById("boot");
+          if (!b) return;
+          var reasons = why();
+          var html =
+            '<div id="bootdiag"><div class="box">' +
+            '<h2>Приложение не запустилось</h2>' +
+            "<p>Форма № 066/у не смогла стартовать в этом браузере. Вот что нужно проверить:</p>" +
+            "<ol>" +
+            reasons
+              .map(function (r) {
+                return "<li>" + r + "</li>";
+              })
+              .join("") +
+            "</ol>" +
+            '<div class="file">Открыт адрес: ' +
+            (location.href || "—") +
+            "</div>" +
+            (reasonText ? '<div class="err">Техническая информация: ' + reasonText + "</div>" : "") +
+            "<p style=\"margin-top:14px\">Самый надёжный способ: нажмите кнопку «📦 Офлайн-копия» на работающем приложении, сохраните файл и открывайте его — либо загрузите содержимое папки <code>dist</code> на хостинг.</p>" +
+            "<button onclick=\"location.reload()\">Попробовать снова</button>" +
+            "</div></div>";
+          b.innerHTML = html;
+          b.id = "bootdiag";
+        }
+
+        window.addEventListener("error", function (e) {
+          if (started) return;
+          var m = "";
+          if (e && e.message) m = e.message;
+          if (e && e.filename) m += " (" + e.filename + ":" + (e.lineno || 0) + ")";
+          lastError = m;
+        });
+
+        window.addEventListener("unhandledrejection", function (e) {
+          if (started) return;
+          try {
+            lastError = String((e && e.reason && e.reason.message) || e.reason || "");
+          } catch (x) {}
+        });
+
+        setTimeout(function () {
+          if (!started) show(lastError);
+        }, 2500);
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
