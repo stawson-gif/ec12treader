@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лист назначений — медицинская форма</title>
+<style>
+:root{--ink:#18252b;--muted:#63747a;--paper:#fffdfa;--canvas:#eef3f1;--accent:#146b62;--accent-2:#dbeee8}
+*{box-sizing:border-box}html{background:var(--canvas)}body{margin:0;color:var(--ink);font:15px/1.4 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app-shell{min-height:100vh;display:grid;grid-template-columns:390px 1fr}.control-panel{background:#193238;color:#eff8f5;padding:28px 24px;overflow:auto}.brand{display:flex;align-items:center;gap:12px;margin-bottom:34px}.brand-mark{width:38px;height:38px;border:1px solid #92cec1;border-radius:12px;display:grid;place-items:center;color:#bbf2df;font-size:20px}.brand h1{font-size:16px;margin:0;font-weight:650}.brand p{font-size:11px;color:#a7c0bb;margin:3px 0 0}.section-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8bb3ac;margin:25px 0 12px;font-weight:700}.field{margin:0 0 12px}.field label{display:block;font-size:12px;color:#bdd0cc;margin:0 0 5px}.field input,.field textarea{width:100%;border:1px solid #426168;border-radius:7px;background:#243e44;color:#fff;padding:10px 11px;font:inherit;outline:none}.field textarea{resize:vertical;min-height:48px}.field input:focus,.field textarea:focus{border-color:#99e2cd;box-shadow:0 0 0 3px #9be4d122}.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:9px;margin-top:25px;position:sticky;bottom:0;padding-top:12px;background:linear-gradient(#19323800,#193238 18%)}button{border:0;border-radius:7px;padding:11px 14px;font:inherit;font-weight:650;cursor:pointer}.btn-primary{background:#b7efd9;color:#123b37;flex:1}.btn-ghost{background:#29484e;color:#dff5ee}.hint{font-size:12px;color:#9db7b2;margin:10px 0 0}.workspace{padding:34px 40px 60px;overflow:auto}.workspace-head{max-width:1120px;margin:0 auto 22px;display:flex;justify-content:space-between;align-items:end;gap:20px}.workspace-head h2{margin:0;font:600 clamp(24px,3vw,36px)/1.05 Georgia,serif}.workspace-head p{color:var(--muted);margin:8px 0 0}.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;background:#38a878;border-radius:50%;box-shadow:0 0 0 4px #38a8781b}.preview-wrap{max-width:1120px;margin:auto;background:#dbe4e1;padding:28px;box-shadow:0 20px 50px #1d353c18}.print-sheet{background:var(--paper);color:#111;min-width:920px;aspect-ratio:1.414/1;padding:30px 28px 24px;font-family:Arial,sans-serif}.print-title{text-align:center;font-size:17px;font-weight:700;margin:0 0 22px}.patient-line{font-size:11px;margin:6px 0;white-space:nowrap}.line-fill{display:inline-block;border-bottom:1px solid #444;height:14px;vertical-align:bottom}.w-name{width:235px}.w-birth{width:105px}.w-card{width:86px}.w-room{width:50px}.diagnosis{font-size:11px;margin-top:3px}.allergy{font-size:11px;margin-top:5px;line-height:1.35}.allergy-line{border-bottom:1px solid #444;height:16px;margin-top:5px}.paper-table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:25px;font-size:9px}.paper-table th,.paper-table td{border:1px solid #333;padding:3px;vertical-align:middle}.paper-table thead th{font-weight:400;text-align:center}.paper-table .main-head{height:34px;font-size:9px}.paper-table .sub-head{height:71px}.paper-table .medicine{width:18%}.paper-table .date{width:9%}.paper-table .cancel{width:10%}.paper-table .slot{width:3.7%;padding:0}.paper-table .reaction{width:12%}.paper-table tbody td{height:24px}.paper-table tbody .slot{text-align:center;font-size:8px}.paper-table .footer-row td{height:43px}.footer-label{font-size:9px;line-height:1.15}.paper-table tbody td[contenteditable="true"]{cursor:text;outline:none;white-space:pre-wrap;overflow-wrap:anywhere}.paper-table tbody td[contenteditable="true"]:focus{background:#edf7f2;box-shadow:inset 0 0 0 1px #579883}.rows-editor{margin-top:18px;max-width:1120px;margin-left:auto;margin-right:auto}.rows-editor-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.rows-editor-head h3{font-size:14px;margin:0}.rows-editor-head button{padding:8px 11px;background:var(--accent-2);color:var(--accent)}.row-chip{background:#fff;border:1px solid #cfdbd8;border-radius:7px;padding:9px 10px;margin-bottom:8px;display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1.2fr 32px;gap:7px}.row-chip input{width:100%;border:1px solid #d7e0de;border-radius:5px;padding:7px;font:12px inherit}.row-chip button{padding:0;background:#f8e3e0;color:#a04c42;border-radius:5px}
+.intervention-sheet{display:none;background:var(--paper);color:#111;min-width:920px;aspect-ratio:1.414/1;padding:30px 28px 24px;font-family:Arial,sans-serif}.intervention-table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}.intervention-table th,.intervention-table td{border:1.5px solid #222;padding:8px;vertical-align:middle}.intervention-table th{text-align:center;font-size:13px;line-height:1.25}.intervention-table .i-procedure{width:37%}.intervention-table .i-date{width:11%}.intervention-table .i-doctor{width:17%}.intervention-table .i-time{width:10%}.intervention-table .i-worker{width:25%}
+@media(max-width:1000px){.app-shell{grid-template-columns:1fr}.workspace{padding:22px 14px 40px}.preview-wrap{padding:10px;overflow:auto}.workspace-head{align-items:start;flex-direction:column}.row-chip{grid-template-columns:1fr 1fr 1fr}.row-chip button{grid-column:3}}
+@page{size:A4 landscape;margin:0}
+@media print{
+ html,body{margin:0!important;padding:0!important;width:297mm!important;background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .app-shell,.workspace,.preview-wrap{display:block!important;width:297mm!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important;box-shadow:none!important}
+ .control-panel,.workspace-head,.rows-editor{display:none!important}
+ .print-sheet,.intervention-sheet{display:block!important;position:relative!important;width:297mm!important;height:210mm!important;min-width:0!important;max-width:none!important;aspect-ratio:auto!important;margin:0!important;padding:8mm!important;overflow:hidden!important;box-sizing:border-box!important;break-inside:avoid!important;page-break-inside:avoid!important}
+ .print-sheet{break-after:page!important;page-break-after:always!important}
+ .intervention-sheet{break-before:page!important;page-break-before:always!important}
+ .print-title{font-size:13pt!important;margin:0 0 3mm!important}.patient-line,.diagnosis,.allergy{font-size:8pt!important}.paper-table{margin-top:4mm!important;font-size:6.5pt!important}.paper-table th,.paper-table td{padding:1mm!important}.paper-table thead .main-head{height:9mm!important;font-size:6.5pt!important}.paper-table .sub-head{height:18mm!important}.paper-table tbody td{height:6.5mm!important}.paper-table .footer-row td{height:12mm!important}
+ .intervention-table{width:100%!important;height:100%!important;font-size:10pt!important}.intervention-table th,.intervention-table td{padding:3mm!important}.intervention-table th{font-size:10pt!important}
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+<aside class="control-panel">
+  <div class="brand"><div class="brand-mark">✚</div><div><h1>Лист назначений</h1><p>Заполнение медицинской формы</p></div></div>
+  <div class="section-title">Пациент</div>
+  <div class="field"><label for="name">Фамилия, имя, отчество</label><input id="name" placeholder="Введите ФИО пациента"></div>
+  <div class="grid-2"><div class="field"><label for="birth">Дата рождения</label><input id="birth" placeholder="дд.мм.гггг"></div><div class="field"><label for="room">№ палаты</label><input id="room" placeholder="—"></div></div>
+  <div class="field"><label for="card">№ медицинской карты</label><input id="card" placeholder="Введите номер карты"></div>
+  <div class="field"><label for="diagnosis">Диагноз (основное заболевание)</label><textarea id="diagnosis" placeholder="Укажите диагноз"></textarea></div>
+  <div class="field"><label for="allergy">Аллергические реакции и непереносимость</label><textarea id="allergy" placeholder="Если реакций нет, укажите «нет»"></textarea></div>
+  <div class="section-title">Назначения</div>
+  <p class="hint">Добавьте препараты, лечебное питание или режим. Отметки выполнения можно поставить прямо в строке предпросмотра.</p>
+  <div class="actions"><button class="btn-primary" id="printBtn">Экспортировать в PDF</button><button class="btn-ghost" id="clearBtn">Очистить</button></div>
+</aside>
+<main class="workspace">
+  <div class="workspace-head"><div><h2>Рабочий лист</h2><p>Заполните поля слева — бланк обновится автоматически.</p></div><div class="status"><span class="dot"></span><span>Готово к заполнению</span></div></div>
+  <div class="preview-wrap"><section class="print-sheet" id="sheet">
+    <h1 class="print-title">ЛИСТ НАЗНАЧЕНИЙ И ИХ ВЫПОЛНЕНИЕ</h1>
+    <div class="patient-line">Фамилия, имя, отчество (при наличии) <span class="line-fill w-name" id="p-name"></span> Дата рождения «<span class="line-fill w-birth" id="p-birth"></span>» г. № медицинской карты <span class="line-fill w-card" id="p-card"></span> № палаты <span class="line-fill w-room" id="p-room"></span></div>
+    <div class="diagnosis">Диагноз (основное заболевание): <span class="line-fill" style="width:73%" id="p-diagnosis"></span></div>
+    <div class="allergy">Аллергические реакции на лекарственные препараты, пищевая аллергия или иные виды непереносимости в анамнезе, с указанием типа и вида аллергической реакции:<div class="allergy-line" id="p-allergy"></div></div>
+    <table class="paper-table"><thead><tr><th rowspan="2" class="medicine">Лекарственный препарат<br>(наименование,<br>лекарственная форма,<br>дозировка, способ<br>введения (применения),<br>лечебное питание, режим</th><th rowspan="2" class="date">Дата<br>назначения;<br>подпись<br>лечащего<br>врача</th><th rowspan="2" class="cancel">Дата<br>отмены;<br>подпись<br>лечащего<br>врача</th><th colspan="14" class="main-head">Отметки об исполнении назначения лекарственного препарата, лечебного питания, режима (дата и время исполнения,<br>подпись медицинского работника, ответственного за исполнение)<br>(время, дата подпись)</th><th rowspan="2" class="reaction">Сведения о<br>реакции на<br>применение<br>(при наличии)</th></tr><tr class="sub-head" id="slot-head"></tr></thead><tbody id="paper-body"></tbody></table>
+  </section><section class="intervention-sheet" id="interventionSheet"><table class="intervention-table"><thead><tr><th class="i-procedure">Медицинское вмешательство</th><th class="i-date">Дата назначения</th><th class="i-doctor">Подпись лечащего врача (врача-специалиста), сделавшего назначение</th><th class="i-time">Дата и время исполнения назначения</th><th class="i-worker">Фамилия, имя, отчество (при наличии) и подпись медицинского работника, ответственного за исполнение назначения</th></tr></thead><tbody id="interventionBody"></tbody></table></section></div>
+  <div class="rows-editor"><div class="rows-editor-head"><h3>Строки назначений</h3><button id="addBtn">+ Добавить строку</button></div><div id="rows"></div></div>
+</main>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const ORIGINAL_ROWS=19;
+let rows=Array.from({length:ORIGINAL_ROWS},()=>({medicine:'',date:'',cancel:'',reaction:''}));
+const fields=['name','birth','room','card','diagnosis','allergy'];
+function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function syncPatient(){ $('p-name').textContent=$('name').value; $('p-birth').textContent=$('birth').value; $('p-room').textContent=$('room').value; $('p-card').textContent=$('card').value; $('p-diagnosis').textContent=$('diagnosis').value; $('p-allergy').textContent=$('allergy').value; }
+function renderSlots(){ $('slot-head').innerHTML=Array.from({length:14},(_,i)=>`<th class="slot">${i+1}</th>`).join(''); }
+function renderRows(){
+ $('rows').innerHTML=rows.map((r,i)=>`<div class="row-chip"><input data-i="${i}" data-k="medicine" value="${esc(r.medicine)}" placeholder="Препарат / назначение"><input data-i="${i}" data-k="date" value="${esc(r.date)}" placeholder="Дата назначения"><input data-i="${i}" data-k="cancel" value="${esc(r.cancel)}" placeholder="Дата отмены"><input data-i="${i}" data-k="reaction" value="${esc(r.reaction)}" placeholder="Реакция"><input data-i="${i}" data-k="note" value="${esc(r.note||'')}" placeholder="Примечание"><button data-remove="${i}" title="Удалить строку">×</button></div>`).join('');
+ $('paper-body').innerHTML=rows.map((r,i)=>`<tr><td contenteditable="true" data-row="${i}" data-col="medicine" aria-label="Препарат, строка ${i+1}">${esc(r.medicine)}</td><td contenteditable="true" data-row="${i}" data-col="date" aria-label="Дата назначения, строка ${i+1}">${esc(r.date)}</td><td contenteditable="true" data-row="${i}" data-col="cancel" aria-label="Дата отмены, строка ${i+1}">${esc(r.cancel)}</td>${Array.from({length:14},(_,j)=>`<td class="slot" contenteditable="true" aria-label="Отметка ${j+1} для строки ${i+1}"></td>`).join('')}<td contenteditable="true" data-row="${i}" data-col="reaction" aria-label="Реакция, строка ${i+1}">${esc(r.reaction)}</td></tr>`).join('')+`<tr class="footer-row"><td class="footer-label">Подпись медицинского<br>работника, ответственного<br>за контроль исполнения<br>назначений</td><td></td><td></td>${Array.from({length:14},()=>'<td class="slot"></td>').join('')}<td></td></tr>`;
+}
+fields.forEach(id=>$(id).addEventListener('input',syncPatient));
+$('rows').addEventListener('input',e=>{if(e.target.dataset.i!==undefined){const row=+e.target.dataset.i;rows[row][e.target.dataset.k]=e.target.value;syncPaperCell(row,e.target.dataset.k,e.target.value);}});
+function syncPaperCell(row,col,value){const cell=document.querySelector(`[data-row="${row}"][data-col="${col}"]`);if(cell)cell.textContent=value;}
+$('paper-body').addEventListener('input',e=>{if(e.target.dataset.row!==undefined){const row=+e.target.dataset.row;rows[row][e.target.dataset.col]=e.target.textContent;const editor=document.querySelector(`#rows [data-i="${row}"][data-k="${e.target.dataset.col}"]`);if(editor)editor.value=e.target.textContent;}});
+$('rows').addEventListener('click',e=>{if(e.target.dataset.remove!==undefined){rows.splice(+e.target.dataset.remove,1);if(!rows.some(r=>r.medicine||r.date||r.cancel||r.reaction)){rows=Array.from({length:ORIGINAL_ROWS},()=>({medicine:'',date:'',cancel:'',reaction:''}));}renderRows();}});
+$('addBtn').onclick=()=>{rows.push({medicine:'',date:'',cancel:'',reaction:''});renderRows();};
+$('printBtn').onclick=()=>window.print();
+$('clearBtn').onclick=()=>{if(confirm('Очистить все заполненные поля?')){fields.forEach(id=>$(id).value='');rows=Array.from({length:ORIGINAL_ROWS},()=>({medicine:'',date:'',cancel:'',reaction:''}));syncPatient();renderRows();}};
+function renderInterventionRows(){ $('interventionBody').innerHTML=Array.from({length:10},()=>'<tr><td></td><td></td><td></td><td></td><td></td></tr>').join(''); }
+renderSlots();syncPatient();renderRows();renderInterventionRows();
+</script>
+</body>
+</html>
